@@ -11,6 +11,16 @@ public class Player : MonoBehaviour
   [SerializeField] private float _dashSpeed = 3;
   [SerializeField] private float _dashDuration = 1;
   [SerializeField] private float _dashCooldown = 1;
+  [SerializeField] private float _teleportDistance = 2;
+  [SerializeField] private float _teleportCooldown = 1;
+  [SerializeField] private float _teleportMinCharge = 1;
+  [SerializeField] private float _teleportMaxCharge = 2;
+  [SerializeField] private LayerMask _thickWallLayer = 0;
+  [SerializeField] private float _bounceSpeed = 3;
+  [SerializeField] private float _bounceDuration = 1;
+  [SerializeField] private float _bounceCooldown = 1;
+  [SerializeField] private float _bounceMinCharge = 1;
+  [SerializeField] private float _bounceMaxCharge = 2;
   
   [Header("Character Variables")]
   [SerializeField] private PlayerRole _role = PlayerRole.Decoy;
@@ -20,6 +30,9 @@ public class Player : MonoBehaviour
   [SerializeField] private Rigidbody2D _rigidbody = null;
   [SerializeField] private Transform _cursorAnchor = null;
   [SerializeField] private Camera _camera = null;
+  [SerializeField] private PhysicsMaterial2D _normalPhysics = null;
+  [SerializeField] private PhysicsMaterial2D _bouncyPhysics = null;
+  [SerializeField] private CapsuleCollider2D _collider = null;
   
   private bool _moving = false;
   private Vector2 _moveDirection = new();
@@ -32,6 +45,14 @@ public class Player : MonoBehaviour
   private bool _dashing = false;
   private float _dashTimer = 0;
   private float _dashCooldownTimer = 0;
+  private bool _chargingTeleport = false;
+  private float _teleportCharge = 0;
+  private float _teleportCooldownTimer = 0;
+  private bool _bouncing = false;
+  private float _bounceTimer = 0;
+  private float _bounceCooldownTimer = 0;
+  private bool _chargingBounce = false;
+  private float _bounceCharge = 0;
   
   private void Start() {
     // The character should be able to immediately sprint
@@ -45,7 +66,7 @@ public class Player : MonoBehaviour
       UpdateAimCursor();
     }
     
-    if (_sprinting && !_dashing) {
+    if (_sprinting && !_dashing && !_bouncing) {
       // Decrease stamina over time
       _stamina = Mathf.Clamp(_stamina - Time.deltaTime, 0, _sprintDuration);
       
@@ -57,7 +78,7 @@ public class Player : MonoBehaviour
         // If moving, update the velocity to walking speed
         if (_moving) _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
       }
-    } else if (!_dashing) {
+    } else if (!_dashing && !_bouncing) {
       // Recharge stamina over time
       _stamina = Mathf.Clamp(_stamina + Time.deltaTime, 0, _sprintDuration);
       
@@ -85,6 +106,41 @@ public class Player : MonoBehaviour
       // Decrease the dash cooldown timer over time
       _dashCooldownTimer = Mathf.Clamp(_dashCooldownTimer - Time.deltaTime, 0, _dashCooldown);
     }
+    
+    // Charge up the teleport over time if trying to
+    if (_chargingTeleport && !Mathf.Approximately(_teleportCharge, _teleportMaxCharge)) {
+      _teleportCharge = Mathf.Clamp(_teleportCharge + Time.deltaTime, _teleportMinCharge, _teleportMaxCharge);
+    }
+    
+    // Decrease the teleport cooldown timer over time
+    if (!Mathf.Approximately(_teleportCooldownTimer, 0)) {
+      _teleportCooldownTimer = Mathf.Clamp(_teleportCooldownTimer - Time.deltaTime, 0, _teleportCooldown);
+    }
+    
+    if (_bouncing) {
+      // Decrease bounce timer over time
+      _bounceTimer = Mathf.Clamp(_bounceTimer - Time.deltaTime, 0, _bounceDuration);
+      // Make sure to keep the bouncing at the same speed
+      _rigidbody.linearVelocity = _bounceSpeed * _rigidbody.linearVelocity.normalized;
+      
+      // Start the cooldown if done bouncing and reset the velocity
+      if (Mathf.Approximately(_bounceTimer, 0)) {
+        _bouncing = false;
+        _bounceCooldownTimer = _bounceCooldown;
+        _rigidbody.sharedMaterial = _normalPhysics;
+        _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+        // Switch to sprinting if trying to
+        TryToSprint();
+      }
+    } else if (!Mathf.Approximately(_bounceCooldownTimer, 0)) {
+      // Decrease the bounce cooldown timer over time
+      _bounceCooldownTimer = Mathf.Clamp(_bounceCooldownTimer - Time.deltaTime, 0, _bounceCooldown);
+    }
+    
+    // Charge up the bounce over time if trying to
+    if (_chargingBounce && !Mathf.Approximately(_bounceCharge, _bounceMaxCharge)) {
+      _bounceCharge = Mathf.Clamp(_bounceCharge + Time.deltaTime, _bounceMinCharge, _bounceMaxCharge);
+    }
   }
   
   public void OnMove(InputAction.CallbackContext context) {
@@ -94,8 +150,8 @@ public class Player : MonoBehaviour
     // If moving, set the last move direction
     if (_moving) _lastMoveDirection = _moveDirection;
     
-    // If dashing, ignore the rest
-    if (_dashing) return;
+    // If dashing or bouncing, ignore the rest
+    if (_dashing || _bouncing) return;
     
     // Update the velocity based on the speed, either sprint or walk speed
     _rigidbody.linearVelocity = _moving
@@ -145,6 +201,7 @@ public class Player : MonoBehaviour
     // and if the dash cooldown is done
     if (!context.started
       || (_role != PlayerRole.Decoy && _role != PlayerRole.Support)
+      || _chargingTeleport || _chargingBounce || _bouncing
       || !Mathf.Approximately(_dashTimer, 0)
       || !Mathf.Approximately(_dashCooldownTimer, 0)) return;
     
@@ -153,6 +210,58 @@ public class Player : MonoBehaviour
     _dashTimer = _dashDuration;
     // Dash in the last move direction
     _rigidbody.linearVelocity = _dashSpeed * _lastMoveDirection;
+  }
+  
+  public void OnTeleport(InputAction.CallbackContext context) {
+    // A teleport can only happen if the role allows for teleporting,
+    // if the teleport cooldown is done, and the player isn't dashing
+    if ((_role != PlayerRole.Observer && _role != PlayerRole.Support)
+      || _dashing || _chargingBounce || _bouncing
+      || !Mathf.Approximately(_teleportCooldownTimer, 0)) return;
+    
+    // Start charging
+    if (context.started) {
+      _chargingTeleport = true;
+      _teleportCharge = _teleportMinCharge;
+    } else if (context.canceled && _chargingTeleport) {
+      // Calculate the new position based on the charge level
+      Vector3 newPosition = transform.position + _teleportDistance
+        * (_teleportCharge / _teleportMaxCharge) * (Vector3) _lastMoveDirection;
+      
+      // Check if there is a wall in the way, and exit if so
+      if (Physics2D.OverlapBox(newPosition, _collider.size, 0, _thickWallLayer)) return;
+      
+      // Teleport and start the cooldown
+      _teleportCooldownTimer = _teleportCooldown;
+      _chargingTeleport = false;
+      // Teleport in the last move direction
+      transform.position = newPosition;
+      _teleportCharge = _teleportMinCharge;
+    }
+  }
+  
+  public void OnBounce(InputAction.CallbackContext context) {
+    // A bounce can only happen when the bounce button is pressed,
+    // if the role allows for bouncing, if the bounce timer is not running,
+    // and if the bounce cooldown is done
+    if ((_role != PlayerRole.Decoy && _role != PlayerRole.Observer)
+      || _dashing || _chargingTeleport
+      || !Mathf.Approximately(_bounceTimer, 0)
+      || !Mathf.Approximately(_bounceCooldownTimer, 0)) return;
+    
+    // Start charging
+    if (context.started) {
+      _chargingBounce = true;
+      _bounceCharge = _bounceMinCharge;
+    } else if (context.canceled && _chargingBounce) {
+      // Start bouncing
+      _chargingBounce = false;
+      _bouncing = true;
+      _bounceTimer = _bounceDuration * (_bounceCharge / _bounceMaxCharge);
+      _rigidbody.sharedMaterial = _bouncyPhysics;
+      _rigidbody.linearVelocity = _bounceSpeed * _lastMoveDirection;
+      _bounceCharge = _bounceMinCharge;
+    }
   }
   
   private void UpdateMouseAim() {
