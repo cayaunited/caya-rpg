@@ -566,6 +566,10 @@ MonoBehaviour:
   _walkSpeed: 2
   _sprintSpeed: 4
   _sprintDuration: 2
+  _dashSpeed: 10
+  _dashDuration: 0.25
+  _dashCooldown: 1
+  _role: 0
   _input: {fileID: 1341914093}
   _rigidbody: {fileID: 1341914095}
   _cursorAnchor: {fileID: 1053638035}
@@ -683,6 +687,22 @@ MonoBehaviour:
       m_Calls: []
     m_ActionId: 9caa3d8a-6b2f-4e8e-8bad-6ede561bd9be
     m_ActionName: UI/TrackedDeviceOrientation
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1341914092}
+        m_TargetAssemblyTypeName: Player, Assembly-CSharp
+        m_MethodName: OnDash
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: ce601248-3f35-423a-bcab-a3946799fe8d
+    m_ActionName: 'Player/Dash[/Keyboard/space,/DualSenseGamepadHID/buttonWest]'
   m_NeverAutoSwitchControlSchemes: 1
   m_DefaultControlScheme: Keyboard & Mouse
   m_DefaultActionMap: Player
