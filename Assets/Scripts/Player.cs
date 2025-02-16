@@ -21,6 +21,11 @@ public class Player : MonoBehaviour
   [SerializeField] private float _bounceCooldown = 1;
   [SerializeField] private float _bounceMinCharge = 1;
   [SerializeField] private float _bounceMaxCharge = 2;
+  [SerializeField] private float _grappleRange = 2;
+  [SerializeField] private float _grappleSpeed = 3;
+  [SerializeField] private float _grappleDuration = 1;
+  [SerializeField] private float _grappleCooldown = 1;
+  [SerializeField] private LayerMask _grappleWallLayer = 0;
   
   [Header("Character Variables")]
   [SerializeField] private PlayerRole _role = PlayerRole.Decoy;
@@ -33,6 +38,7 @@ public class Player : MonoBehaviour
   [SerializeField] private PhysicsMaterial2D _normalPhysics = null;
   [SerializeField] private PhysicsMaterial2D _bouncyPhysics = null;
   [SerializeField] private CapsuleCollider2D _collider = null;
+  [SerializeField] private SpriteRenderer _hookRenderer = null;
   
   private bool _moving = false;
   private Vector2 _moveDirection = new();
@@ -53,6 +59,10 @@ public class Player : MonoBehaviour
   private float _bounceCooldownTimer = 0;
   private bool _chargingBounce = false;
   private float _bounceCharge = 0;
+  private bool _grappling = false;
+  private float _grappleTimer = 0;
+  private float _grappleCooldownTimer = 0;
+  private Vector3 _grapplePoint = new();
   
   private void Start() {
     // The character should be able to immediately sprint
@@ -66,7 +76,7 @@ public class Player : MonoBehaviour
       UpdateAimCursor();
     }
     
-    if (_sprinting && !_dashing && !_bouncing) {
+    if (_sprinting && !_dashing && !_bouncing && !_grappling) {
       // Decrease stamina over time
       _stamina = Mathf.Clamp(_stamina - Time.deltaTime, 0, _sprintDuration);
       
@@ -78,7 +88,7 @@ public class Player : MonoBehaviour
         // If moving, update the velocity to walking speed
         if (_moving) _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
       }
-    } else if (!_dashing && !_bouncing) {
+    } else if (!_dashing && !_bouncing && !_grappling) {
       // Recharge stamina over time
       _stamina = Mathf.Clamp(_stamina + Time.deltaTime, 0, _sprintDuration);
       
@@ -141,6 +151,25 @@ public class Player : MonoBehaviour
     if (_chargingBounce && !Mathf.Approximately(_bounceCharge, _bounceMaxCharge)) {
       _bounceCharge = Mathf.Clamp(_bounceCharge + Time.deltaTime, _bounceMinCharge, _bounceMaxCharge);
     }
+    
+    if (_grappling) {
+      // Decrease grapple timer over time
+      _grappleTimer = Mathf.Clamp(_grappleTimer - Time.deltaTime, 0, _grappleDuration);
+      // Update the grappling hook visual
+      UpdateHook();
+      
+      // Start the cooldown if done grappling and reset the velocity
+      if (Mathf.Approximately(_grappleTimer, 0)) StopGrappling();
+    } else if (!Mathf.Approximately(_grappleCooldownTimer, 0)) {
+      // Decrease the grapple cooldown timer over time
+      _grappleCooldownTimer = Mathf.Clamp(_grappleCooldownTimer - Time.deltaTime, 0, _grappleCooldown);
+    }
+  }
+  
+  private void OnCollisionEnter2D(Collision2D collision)
+  {
+    // If grappling and hit a wall, stop grappling
+    if (_grappling && _collider.IsTouchingLayers(_grappleWallLayer)) StopGrappling();
   }
   
   public void OnMove(InputAction.CallbackContext context) {
@@ -150,8 +179,8 @@ public class Player : MonoBehaviour
     // If moving, set the last move direction
     if (_moving) _lastMoveDirection = _moveDirection;
     
-    // If dashing or bouncing, ignore the rest
-    if (_dashing || _bouncing) return;
+    // If dashing, bouncing, or grappling, ignore the rest
+    if (_dashing || _bouncing || _grappling) return;
     
     // Update the velocity based on the speed, either sprint or walk speed
     _rigidbody.linearVelocity = _moving
@@ -164,7 +193,7 @@ public class Player : MonoBehaviour
   
   public void OnAim(InputAction.CallbackContext context) {
     // Read the input direction and exit if there is no input
-    var inputDirection = context.ReadValue<Vector2>();
+    var inputDirection = context.ReadValue<Vector2>().normalized;
     if (Mathf.Approximately(inputDirection.sqrMagnitude, 0)) return;
     
     // Read the aim direction, either the vector between
@@ -201,7 +230,7 @@ public class Player : MonoBehaviour
     // and if the dash cooldown is done
     if (!context.started
       || (_role != PlayerRole.Decoy && _role != PlayerRole.Support)
-      || _chargingTeleport || _chargingBounce || _bouncing
+      || _chargingTeleport || _chargingBounce || _bouncing || _grappling
       || !Mathf.Approximately(_dashTimer, 0)
       || !Mathf.Approximately(_dashCooldownTimer, 0)) return;
     
@@ -216,7 +245,7 @@ public class Player : MonoBehaviour
     // A teleport can only happen if the role allows for teleporting,
     // if the teleport cooldown is done, and the player isn't dashing
     if ((_role != PlayerRole.Observer && _role != PlayerRole.Support)
-      || _dashing || _chargingBounce || _bouncing
+      || _dashing || _chargingBounce || _bouncing || _grappling
       || !Mathf.Approximately(_teleportCooldownTimer, 0)) return;
     
     // Start charging
@@ -245,7 +274,7 @@ public class Player : MonoBehaviour
     // if the role allows for bouncing, if the bounce timer is not running,
     // and if the bounce cooldown is done
     if ((_role != PlayerRole.Decoy && _role != PlayerRole.Observer)
-      || _dashing || _chargingTeleport
+      || _dashing || _chargingTeleport || _grappling
       || !Mathf.Approximately(_bounceTimer, 0)
       || !Mathf.Approximately(_bounceCooldownTimer, 0)) return;
     
@@ -264,6 +293,30 @@ public class Player : MonoBehaviour
     }
   }
   
+  public void OnGrapple(InputAction.CallbackContext context) {
+    // A grapple can only happen when the grapple button is released,
+    // if the role allows for grappling, if the grapple timer is not running,
+    // and if the grapple cooldown is done
+    if (!context.canceled
+      || (_role != PlayerRole.Decoy && _role != PlayerRole.Observer)
+      || _dashing || _chargingTeleport || _chargingBounce || _bouncing
+      || !Mathf.Approximately(_grappleTimer, 0)
+      || !Mathf.Approximately(_grappleCooldownTimer, 0)) return;
+    
+    // Try grappling in the aim direction and exit if there is no wall in range
+    var wallHit = Physics2D.Raycast(transform.position, _aimDirection, _grappleRange, _grappleWallLayer);
+    if (!wallHit) return;
+    // Start grappling and start the timer
+    _grappling = true;
+    _grappleTimer = _grappleDuration;
+    // Grapple in the aim direction
+    _rigidbody.linearVelocity = _grappleSpeed * _aimDirection;
+    // Connect the grappling hook to the wall
+    _grapplePoint = wallHit.point;
+    _hookRenderer.gameObject.SetActive(true);
+    UpdateHook();
+  }
+  
   private void UpdateMouseAim() {
     // Find the mouse's position in the world
     var mousePosition = _camera.ScreenToWorldPoint(Mouse.current.position.ReadValue());
@@ -275,7 +328,7 @@ public class Player : MonoBehaviour
   
   private void UpdateAimCursor() {
     // Update the cursor based on the aim direction
-    _cursorAnchor.localEulerAngles = new Vector3(0, 0,
+    _cursorAnchor.localEulerAngles = new(0, 0,
       Mathf.Rad2Deg * Mathf.Atan2(_aimDirection.y, _aimDirection.x));
   }
   
@@ -285,5 +338,26 @@ public class Player : MonoBehaviour
       _sprinting = true;
       _rigidbody.linearVelocity = _sprintSpeed * _moveDirection;
     }
+  }
+  
+  private void UpdateHook() {
+    // Calculate the angle and distance between the player and grapple point
+    var difference = _grapplePoint - transform.position;
+    float angle = Mathf.Rad2Deg * Mathf.Atan2(difference.y, difference.x);
+    float distance = difference.magnitude;
+    // Update the hook visual
+    _hookRenderer.transform.localEulerAngles = new(0, 0, angle);
+    _hookRenderer.size = new Vector2(distance, _hookRenderer.size.y);
+  }
+  
+  private void StopGrappling() {
+    // Start the cooldown if done grappling and reset the velocity
+    _grappling = false;
+    _grappleTimer = 0;
+    _grappleCooldownTimer = _grappleCooldown;
+    _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+    _hookRenderer.gameObject.SetActive(false);
+    // Switch to sprinting if trying to
+    TryToSprint();
   }
 }
