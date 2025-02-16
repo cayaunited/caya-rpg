@@ -15,7 +15,7 @@ public class Player : MonoBehaviour
   [SerializeField] private float _teleportCooldown = 1;
   [SerializeField] private float _teleportMinCharge = 1;
   [SerializeField] private float _teleportMaxCharge = 2;
-  [SerializeField] private LayerMask _thickWallLayer = 0;
+  [SerializeField] private LayerMask _wallLayer = 0;
   [SerializeField] private float _bounceSpeed = 3;
   [SerializeField] private float _bounceDuration = 1;
   [SerializeField] private float _bounceCooldown = 1;
@@ -25,7 +25,11 @@ public class Player : MonoBehaviour
   [SerializeField] private float _grappleSpeed = 3;
   [SerializeField] private float _grappleDuration = 1;
   [SerializeField] private float _grappleCooldown = 1;
-  [SerializeField] private LayerMask _grappleWallLayer = 0;
+  [SerializeField] private float _steadyDuration = 2;
+  [SerializeField] private float _steadyCooldown = 2;
+  [SerializeField] private Vector2 _linkSearchSize = new(1, 1);
+  [SerializeField] private float _linkRange = 2;
+  [SerializeField] private LayerMask _playerLayer = 0;
   
   [Header("Character Variables")]
   [SerializeField] private PlayerRole _role = PlayerRole.Decoy;
@@ -39,6 +43,7 @@ public class Player : MonoBehaviour
   [SerializeField] private PhysicsMaterial2D _bouncyPhysics = null;
   [SerializeField] private CapsuleCollider2D _collider = null;
   [SerializeField] private SpriteRenderer _hookRenderer = null;
+  [SerializeField] private SpriteRenderer _linkRenderer = null;
   
   private bool _moving = false;
   private Vector2 _moveDirection = new();
@@ -63,6 +68,11 @@ public class Player : MonoBehaviour
   private float _grappleTimer = 0;
   private float _grappleCooldownTimer = 0;
   private Vector3 _grapplePoint = new();
+  private bool _steadying = false;
+  private float _steadyTimer = 0;
+  private float _steadyCooldownTimer = 0;
+  private bool _linking = false;
+  private Player _linkedPlayer = null;
   
   private void Start() {
     // The character should be able to immediately sprint
@@ -164,12 +174,29 @@ public class Player : MonoBehaviour
       // Decrease the grapple cooldown timer over time
       _grappleCooldownTimer = Mathf.Clamp(_grappleCooldownTimer - Time.deltaTime, 0, _grappleCooldown);
     }
+    
+    if (_steadying) {
+      // Decrease steady timer over time
+      _steadyTimer = Mathf.Clamp(_steadyTimer - Time.deltaTime, 0, _steadyDuration);
+      // Start the cooldown if done steadying and reset the velocity
+      if (Mathf.Approximately(_steadyTimer, 0)) StopSteadying();
+    } else if (!Mathf.Approximately(_steadyCooldownTimer, 0)) {
+      // Decrease the steady cooldown timer over time
+      _steadyCooldownTimer = Mathf.Clamp(_steadyCooldownTimer - Time.deltaTime, 0, _steadyCooldown);
+    }
+    
+    if (_linking) {
+      // Update visual and unlink if out of range
+      var distanceSquared = (_linkedPlayer.transform.position - transform.position).sqrMagnitude;
+      if (distanceSquared > _linkRange * _linkRange) StopLinking();
+      else UpdateLink();
+    }
   }
   
   private void OnCollisionEnter2D(Collision2D collision)
   {
     // If grappling and hit a wall, stop grappling
-    if (_grappling && _collider.IsTouchingLayers(_grappleWallLayer)) StopGrappling();
+    if (_grappling && _collider.IsTouchingLayers(_wallLayer)) StopGrappling();
   }
   
   public void OnMove(InputAction.CallbackContext context) {
@@ -179,8 +206,8 @@ public class Player : MonoBehaviour
     // If moving, set the last move direction
     if (_moving) _lastMoveDirection = _moveDirection;
     
-    // If dashing, bouncing, or grappling, ignore the rest
-    if (_dashing || _bouncing || _grappling) return;
+    // If dashing, bouncing, grappling, or steadying, ignore the rest
+    if (_dashing || _bouncing || _grappling || _steadying) return;
     
     // Update the velocity based on the speed, either sprint or walk speed
     _rigidbody.linearVelocity = _moving
@@ -210,9 +237,9 @@ public class Player : MonoBehaviour
     // If the button was pressed and the player is moving
     // the player isn't waiting for a full stamina recharge,
     // the player isn't dashing, and there is stamina left, then start sprinting
-    if (context.started && _moving && _canSprint && !_dashing && _stamina > 0) {
+    if (context.started && _moving && _canSprint
+      && !_dashing && !_bouncing && !_grappling && !_steadying && _stamina > 0) {
       _sprinting = true;
-      // If moving, update the velocity to sprinting speed
       _rigidbody.linearVelocity = _sprintSpeed * _moveDirection;
     }
     // If the button was released, then stop sprinting
@@ -220,7 +247,8 @@ public class Player : MonoBehaviour
       _shouldSprint = false;
       _sprinting = false;
       // If moving and not dashing, update the velocity to walking speed
-      if (_moving && !_dashing) _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
+      if (_moving && !_dashing && !_bouncing && !_grappling && !_steadying)
+        _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
     }
   }
   
@@ -258,7 +286,7 @@ public class Player : MonoBehaviour
         * (_teleportCharge / _teleportMaxCharge) * (Vector3) _lastMoveDirection;
       
       // Check if there is a wall in the way, and exit if so
-      if (Physics2D.OverlapBox(newPosition, _collider.size, 0, _thickWallLayer)) return;
+      if (Physics2D.OverlapBox(newPosition, _collider.size, 0, _wallLayer)) return;
       
       // Teleport and start the cooldown
       _teleportCooldownTimer = _teleportCooldown;
@@ -304,17 +332,82 @@ public class Player : MonoBehaviour
       || !Mathf.Approximately(_grappleCooldownTimer, 0)) return;
     
     // Try grappling in the aim direction and exit if there is no wall in range
-    var wallHit = Physics2D.Raycast(transform.position, _aimDirection, _grappleRange, _grappleWallLayer);
+    var wallHit = Physics2D.Raycast(transform.position, _aimDirection,
+      _grappleRange, _wallLayer);
     if (!wallHit) return;
     // Start grappling and start the timer
     _grappling = true;
     _grappleTimer = _grappleDuration;
+    // Stop steadying if needed
+    if (_steadying) StopSteadying();
+    
     // Grapple in the aim direction
     _rigidbody.linearVelocity = _grappleSpeed * _aimDirection;
     // Connect the grappling hook to the wall
     _grapplePoint = wallHit.point;
     _hookRenderer.gameObject.SetActive(true);
     UpdateHook();
+  }
+  
+  public void OnSteady(InputAction.CallbackContext context) {
+    // A steady can only happen if the role allows for steadying,
+    // and if the steady cooldown is done
+    if (!context.started
+      || (_role != PlayerRole.Observer && _role != PlayerRole.Tank)
+      || _dashing || _chargingTeleport || _chargingBounce
+      || _bouncing || _grappling
+      || !Mathf.Approximately(_steadyCooldownTimer, 0)) return;
+    
+    if (_steadying) {
+      // Stop steadying
+      _steadying = false;
+      _steadyCooldownTimer = _steadyCooldown;
+    } else {
+      // Start steadying and start the timer
+      _steadying = true;
+      _steadyTimer = _steadyDuration;
+      // Stop moving
+      _rigidbody.linearVelocity = new();
+    }
+  }
+  
+  public void OnLink(InputAction.CallbackContext context) {
+    // A link can only happen if the role allows for linking
+    if (!context.started
+      || (_role != PlayerRole.Tank && _role != PlayerRole.Support)) return;
+    
+    // Stop linking
+    if (_linking) StopLinking();
+    else {
+      // Start linking if there is someone in the aim direction to link
+      var playerHits = Physics2D.BoxCastAll(transform.position, _linkSearchSize,
+        0, _aimDirection, _linkRange, _playerLayer);
+      if (playerHits.Length == 0) return;
+      
+      // Search for someone to link with
+      foreach (var hit in playerHits) {
+        if (hit.collider.gameObject == gameObject) continue;
+        var linkedPlayer = hit.collider.GetComponent<Player>();
+        if (!linkedPlayer) continue;
+        
+        // Link with the other player
+        _linking = true;
+        _linkedPlayer = linkedPlayer;
+        _linkRenderer.gameObject.SetActive(true);
+        UpdateLink();
+        
+        // Found someone to link with, so stop looking
+        break;
+      }
+    }
+  }
+  
+  public void OnHole() {
+    // If a decoy or support, hover over the hole
+    // If grappling, grapple over the hole
+    if (_role == PlayerRole.Decoy || _role == PlayerRole.Support
+      || _grappling) return;
+    Debug.Log("FALL IN HOLE");
   }
   
   private void UpdateMouseAim() {
@@ -351,7 +444,7 @@ public class Player : MonoBehaviour
   }
   
   private void StopGrappling() {
-    // Start the cooldown if done grappling and reset the velocity
+    // Start the cooldown and reset the velocity
     _grappling = false;
     _grappleTimer = 0;
     _grappleCooldownTimer = _grappleCooldown;
@@ -359,5 +452,31 @@ public class Player : MonoBehaviour
     _hookRenderer.gameObject.SetActive(false);
     // Switch to sprinting if trying to
     TryToSprint();
+  }
+  
+  private void StopSteadying() {
+    // Start the cooldown and reset the velocity
+    _steadying = false;
+    _steadyCooldownTimer = _steadyCooldown;
+    _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+    // Switch to sprinting if trying to
+    TryToSprint();
+  }
+  
+  private void UpdateLink() {
+    // Calculate the angle and distance between the player and linked player
+    var difference = _linkedPlayer.transform.position - transform.position;
+    float angle = Mathf.Rad2Deg * Mathf.Atan2(difference.y, difference.x);
+    float distance = difference.magnitude;
+    // Update the link visual
+    _linkRenderer.transform.localEulerAngles = new(0, 0, angle);
+    _linkRenderer.size = new Vector2(distance, _linkRenderer.size.y);
+  }
+  
+  private void StopLinking() {
+    // Stop linking
+    _linking = false;
+    _linkedPlayer = null;
+    _linkRenderer.gameObject.SetActive(false);
   }
 }

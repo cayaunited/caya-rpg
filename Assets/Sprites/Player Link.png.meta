@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 19e00c968bd8e4d9097730fb080e037e
+guid: 414c8e784a396411f9c610203788fab3
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5747208679742603155
-    second: Grappling Hook_0
+      213: 6894719143653392378
+    second: Player Link_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -50,7 +50,7 @@ TextureImporter:
   spriteExtrude: 1
   spriteMeshType: 0
   alignment: 4
-  spritePivot: {x: 0.25, y: 0.5}
+  spritePivot: {x: 0, y: 0.5}
   spritePixelsToUnits: 256
   spriteBorder: {x: 32, y: 0, z: 32, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
@@ -113,7 +113,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Grappling Hook_0
+      name: Player Link_0
       rect:
         serializedVersion: 2
         x: 0
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d6086e1e720dd30b0800000000000000
-      internalID: -5747208679742603155
+      spriteID: affbb870886feaf50800000000000000
+      internalID: 6894719143653392378
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Grappling Hook_0: -5747208679742603155
+      Player Link_0: 6894719143653392378
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
