@@ -298,7 +298,7 @@ public class Player : MonoBehaviour
     // if the role allows for grappling, if the grapple timer is not running,
     // and if the grapple cooldown is done
     if (!context.canceled
-      || (_role != PlayerRole.Decoy && _role != PlayerRole.Observer)
+      || (_role != PlayerRole.Decoy && _role != PlayerRole.Tank)
       || _dashing || _chargingTeleport || _chargingBounce || _bouncing
       || !Mathf.Approximately(_grappleTimer, 0)
       || !Mathf.Approximately(_grappleCooldownTimer, 0)) return;
