@@ -4,28 +4,32 @@ using UnityEngine;
 public class PlayerData : ScriptableObject {
   [Header("Character Variables")]
   public PlayerRole Role = PlayerRole.Decoy;
+  public int BaseMobility = 0;
+  public int BaseIntelligence = 0;
+  public int BaseStrength = 0;
+  public int BaseSteadfastness = 0;
   
   [Header("Movement Variables")]
-  public float WalkSpeed = 1;
-  public float SprintSpeed = 2;
-  public float SprintDuration = 1;
-  public float DashSpeed = 3;
-  public float DashDuration = 1;
-  public float DashCooldown = 1;
-  public float TeleportDistance = 2;
-  public float TeleportCooldown = 1;
+  public float[] WalkSpeed = new float[1];
+  public float[] SprintSpeed = new float[1];
+  public float[] SprintDuration = new float[1];
+  public float[] DashSpeed = new float[1];
+  public float[] DashDuration = new float[1];
+  public float[] DashCooldown = new float[1];
+  public float[] TeleportDistance = new float[1];
+  public float[] TeleportCooldown = new float[1];
   public float TeleportMinCharge = 1;
-  public float TeleportMaxCharge = 2;
-  public float BounceSpeed = 3;
-  public float BounceDuration = 1;
-  public float BounceCooldown = 1;
+  public float[] TeleportMaxCharge = new float[1];
+  public float[] BounceSpeed = new float[1];
+  public float[] BounceDuration = new float[1];
+  public float[] BounceCooldown = new float[1];
   public float BounceMinCharge = 1;
-  public float BounceMaxCharge = 2;
-  public float GrappleRange = 2;
-  public float GrappleSpeed = 3;
-  public float GrappleDuration = 1;
-  public float GrappleCooldown = 1;
-  public float SteadyDuration = 2;
-  public float SteadyCooldown = 2;
-  public float LinkRange = 2;
+  public float[] BounceMaxCharge = new float[1];
+  public float[] GrappleRange = new float[1];
+  public float[] GrappleSpeed = new float[1];
+  public float[] GrappleDuration = new float[1];
+  public float[] GrappleCooldown = new float[1];
+  public float[] SteadyDuration = new float[1];
+  public float[] SteadyCooldown = new float[1];
+  public float LinkRange = 1;
 }

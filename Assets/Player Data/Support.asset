@@ -13,25 +13,162 @@ MonoBehaviour:
   m_Name: Support
   m_EditorClassIdentifier: 
   Role: 3
-  WalkSpeed: 2
-  SprintSpeed: 4
-  SprintDuration: 2
-  DashSpeed: 10
-  DashDuration: 0.25
-  DashCooldown: 1
-  TeleportDistance: 6
-  TeleportCooldown: 2
+  BaseMobility: 2
+  BaseIntelligence: 2
+  BaseStrength: 0
+  BaseSteadfastness: 1
+  WalkSpeed:
+  - 2
+  - 2
+  - 2.25
+  - 2.5
+  - 2.75
+  - 3
+  - 3.25
+  SprintSpeed:
+  - 4
+  - 4
+  - 4.5
+  - 5
+  - 5.5
+  - 6
+  - 6.5
+  SprintDuration:
+  - 2
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  DashSpeed:
+  - 10
+  - 10
+  - 11
+  - 12
+  - 13
+  - 13
+  - 13
+  DashDuration:
+  - 0.25
+  - 0.25
+  - 0.3
+  - 0.35
+  - 0.4
+  - 0.4
+  - 0.4
+  DashCooldown:
+  - 1
+  - 1
+  - 0.9
+  - 0.8
+  - 0.7
+  - 0.6
+  - 0.5
+  TeleportDistance:
+  - 6
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  - 10
+  TeleportCooldown:
+  - 2
+  - 2
+  - 1.9
+  - 1.8
+  - 1.7
+  - 1.6
+  - 1.5
   TeleportMinCharge: 1
-  TeleportMaxCharge: 3
-  BounceSpeed: 10
-  BounceDuration: 1
-  BounceCooldown: 2
-  BounceMinCharge: 0.5
-  BounceMaxCharge: 2
-  GrappleRange: 5
-  GrappleSpeed: 7
-  GrappleDuration: 1
-  GrappleCooldown: 1
-  SteadyDuration: 2
-  SteadyCooldown: 2
+  TeleportMaxCharge:
+  - 3
+  - 3
+  - 4
+  - 5
+  - 5
+  - 5
+  - 5
+  BounceSpeed:
+  - 10
+  - 10
+  - 11
+  - 12
+  - 13
+  - 13
+  - 13
+  BounceDuration:
+  - 1
+  - 1
+  - 1.05
+  - 1.1
+  - 1.15
+  - 1.2
+  - 1.25
+  BounceCooldown:
+  - 2
+  - 2
+  - 1.9
+  - 1.8
+  - 1.7
+  - 1.6
+  - 1.5
+  BounceMinCharge: 1
+  BounceMaxCharge:
+  - 2
+  - 2
+  - 2.5
+  - 3
+  - 3.5
+  - 4
+  - 4.5
+  GrappleRange:
+  - 5
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+  GrappleSpeed:
+  - 7
+  - 7
+  - 8
+  - 9
+  - 10
+  - 10
+  - 10
+  GrappleDuration:
+  - 1
+  - 1
+  - 1.05
+  - 1.1
+  - 1.15
+  - 1.2
+  - 1.25
+  GrappleCooldown:
+  - 1
+  - 1
+  - 0.9
+  - 0.8
+  - 0.7
+  - 0.6
+  - 0.5
+  SteadyDuration:
+  - 2
+  - 2
+  - 2.5
+  - 3
+  - 3.5
+  - 4
+  - 4.5
+  SteadyCooldown:
+  - 2
+  - 2
+  - 1.9
+  - 1.8
+  - 1.7
+  - 1.6
+  - 1.5
   LinkRange: 5
