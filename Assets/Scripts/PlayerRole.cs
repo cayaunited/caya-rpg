@@ -1,5 +1,4 @@
-public enum PlayerRole
-{
+public enum PlayerRole {
     Decoy,
     Observer,
     Tank,

@@ -342,7 +342,7 @@ MonoBehaviour:
   _playerLayer:
     serializedVersion: 2
     m_Bits: 960
-  _role: 0
+  _data: {fileID: 11400000, guid: 09a1babc40a7647698d6b76aec46e275, type: 2}
   _input: {fileID: 4120376811541691358}
   _rigidbody: {fileID: 7227172803527639848}
   _cursorAnchor: {fileID: 3696990654217848848}

@@ -1,40 +1,14 @@
-using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class Player : MonoBehaviour
-{
+public class Player : MonoBehaviour {
   [Header("Movement Variables")]
-  [SerializeField] private float _walkSpeed = 1;
-  [SerializeField] private float _sprintSpeed = 2;
-  [SerializeField] private float _sprintDuration = 1;
-  [SerializeField] private float _dashSpeed = 3;
-  [SerializeField] private float _dashDuration = 1;
-  [SerializeField] private float _dashCooldown = 1;
-  [SerializeField] private float _teleportDistance = 2;
-  [SerializeField] private float _teleportCooldown = 1;
-  [SerializeField] private float _teleportMinCharge = 1;
-  [SerializeField] private float _teleportMaxCharge = 2;
   [SerializeField] private LayerMask _wallLayer = 0;
-  [SerializeField] private float _bounceSpeed = 3;
-  [SerializeField] private float _bounceDuration = 1;
-  [SerializeField] private float _bounceCooldown = 1;
-  [SerializeField] private float _bounceMinCharge = 1;
-  [SerializeField] private float _bounceMaxCharge = 2;
-  [SerializeField] private float _grappleRange = 2;
-  [SerializeField] private float _grappleSpeed = 3;
-  [SerializeField] private float _grappleDuration = 1;
-  [SerializeField] private float _grappleCooldown = 1;
-  [SerializeField] private float _steadyDuration = 2;
-  [SerializeField] private float _steadyCooldown = 2;
   [SerializeField] private Vector2 _linkSearchSize = new(1, 1);
-  [SerializeField] private float _linkRange = 2;
   [SerializeField] private LayerMask _playerLayer = 0;
   
-  [Header("Character Variables")]
-  [SerializeField] private PlayerRole _role = PlayerRole.Decoy;
-  
   [Header("Object References")]
+  [SerializeField] private PlayerData _data = null;
   [SerializeField] private PlayerInput _input = null;
   [SerializeField] private Rigidbody2D _rigidbody = null;
   [SerializeField] private Transform _cursorAnchor = null;
@@ -76,7 +50,7 @@ public class Player : MonoBehaviour
   
   private void Start() {
     // The character should be able to immediately sprint
-    _stamina = _sprintSpeed;
+    _stamina = _data.SprintSpeed;
   }
   
   private void Update() {
@@ -88,7 +62,7 @@ public class Player : MonoBehaviour
     
     if (_sprinting && !_dashing && !_bouncing && !_grappling) {
       // Decrease stamina over time
-      _stamina = Mathf.Clamp(_stamina - Time.deltaTime, 0, _sprintDuration);
+      _stamina = Mathf.Clamp(_stamina - Time.deltaTime, 0, _data.SprintDuration);
       
       // Once stamina runs out, the player must wait
       // for a full recharge before sprinting again
@@ -96,14 +70,14 @@ public class Player : MonoBehaviour
         _sprinting = false;
         _canSprint = false;
         // If moving, update the velocity to walking speed
-        if (_moving) _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
+        if (_moving) _rigidbody.linearVelocity = _data.WalkSpeed * _moveDirection;
       }
     } else if (!_dashing && !_bouncing && !_grappling) {
       // Recharge stamina over time
-      _stamina = Mathf.Clamp(_stamina + Time.deltaTime, 0, _sprintDuration);
+      _stamina = Mathf.Clamp(_stamina + Time.deltaTime, 0, _data.SprintDuration);
       
       // Allow for sprinting once at full stamina
-      if (Mathf.Approximately(_stamina, _sprintDuration)) {
+      if (Mathf.Approximately(_stamina, _data.SprintDuration)) {
         _canSprint = true;
         // Switch to sprinting if trying to
         TryToSprint();
@@ -112,59 +86,59 @@ public class Player : MonoBehaviour
     
     if (_dashing) {
       // Decrease dash timer over time
-      _dashTimer = Mathf.Clamp(_dashTimer - Time.deltaTime, 0, _dashDuration);
+      _dashTimer = Mathf.Clamp(_dashTimer - Time.deltaTime, 0, _data.DashDuration);
       
       // Start the cooldown if done dashing and reset the velocity
       if (Mathf.Approximately(_dashTimer, 0)) {
         _dashing = false;
-        _dashCooldownTimer = _dashCooldown;
-        _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+        _dashCooldownTimer = _data.DashCooldown;
+        _rigidbody.linearVelocity = _moving ? _data.WalkSpeed * _moveDirection : new();
         // Switch to sprinting if trying to
         TryToSprint();
       }
     } else if (!Mathf.Approximately(_dashCooldownTimer, 0)) {
       // Decrease the dash cooldown timer over time
-      _dashCooldownTimer = Mathf.Clamp(_dashCooldownTimer - Time.deltaTime, 0, _dashCooldown);
+      _dashCooldownTimer = Mathf.Clamp(_dashCooldownTimer - Time.deltaTime, 0, _data.DashCooldown);
     }
     
     // Charge up the teleport over time if trying to
-    if (_chargingTeleport && !Mathf.Approximately(_teleportCharge, _teleportMaxCharge)) {
-      _teleportCharge = Mathf.Clamp(_teleportCharge + Time.deltaTime, _teleportMinCharge, _teleportMaxCharge);
+    if (_chargingTeleport && !Mathf.Approximately(_teleportCharge, _data.TeleportMaxCharge)) {
+      _teleportCharge = Mathf.Clamp(_teleportCharge + Time.deltaTime, _data.TeleportMinCharge, _data.TeleportMaxCharge);
     }
     
     // Decrease the teleport cooldown timer over time
     if (!Mathf.Approximately(_teleportCooldownTimer, 0)) {
-      _teleportCooldownTimer = Mathf.Clamp(_teleportCooldownTimer - Time.deltaTime, 0, _teleportCooldown);
+      _teleportCooldownTimer = Mathf.Clamp(_teleportCooldownTimer - Time.deltaTime, 0, _data.TeleportCooldown);
     }
     
     if (_bouncing) {
       // Decrease bounce timer over time
-      _bounceTimer = Mathf.Clamp(_bounceTimer - Time.deltaTime, 0, _bounceDuration);
+      _bounceTimer = Mathf.Clamp(_bounceTimer - Time.deltaTime, 0, _data.BounceDuration);
       // Make sure to keep the bouncing at the same speed
-      _rigidbody.linearVelocity = _bounceSpeed * _rigidbody.linearVelocity.normalized;
+      _rigidbody.linearVelocity = _data.BounceSpeed * _rigidbody.linearVelocity.normalized;
       
       // Start the cooldown if done bouncing and reset the velocity
       if (Mathf.Approximately(_bounceTimer, 0)) {
         _bouncing = false;
-        _bounceCooldownTimer = _bounceCooldown;
+        _bounceCooldownTimer = _data.BounceCooldown;
         _rigidbody.sharedMaterial = _normalPhysics;
-        _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+        _rigidbody.linearVelocity = _moving ? _data.WalkSpeed * _moveDirection : new();
         // Switch to sprinting if trying to
         TryToSprint();
       }
     } else if (!Mathf.Approximately(_bounceCooldownTimer, 0)) {
       // Decrease the bounce cooldown timer over time
-      _bounceCooldownTimer = Mathf.Clamp(_bounceCooldownTimer - Time.deltaTime, 0, _bounceCooldown);
+      _bounceCooldownTimer = Mathf.Clamp(_bounceCooldownTimer - Time.deltaTime, 0, _data.BounceCooldown);
     }
     
     // Charge up the bounce over time if trying to
-    if (_chargingBounce && !Mathf.Approximately(_bounceCharge, _bounceMaxCharge)) {
-      _bounceCharge = Mathf.Clamp(_bounceCharge + Time.deltaTime, _bounceMinCharge, _bounceMaxCharge);
+    if (_chargingBounce && !Mathf.Approximately(_bounceCharge, _data.BounceMaxCharge)) {
+      _bounceCharge = Mathf.Clamp(_bounceCharge + Time.deltaTime, _data.BounceMinCharge, _data.BounceMaxCharge);
     }
     
     if (_grappling) {
       // Decrease grapple timer over time
-      _grappleTimer = Mathf.Clamp(_grappleTimer - Time.deltaTime, 0, _grappleDuration);
+      _grappleTimer = Mathf.Clamp(_grappleTimer - Time.deltaTime, 0, _data.GrappleDuration);
       // Update the grappling hook visual
       UpdateHook();
       
@@ -172,29 +146,28 @@ public class Player : MonoBehaviour
       if (Mathf.Approximately(_grappleTimer, 0)) StopGrappling();
     } else if (!Mathf.Approximately(_grappleCooldownTimer, 0)) {
       // Decrease the grapple cooldown timer over time
-      _grappleCooldownTimer = Mathf.Clamp(_grappleCooldownTimer - Time.deltaTime, 0, _grappleCooldown);
+      _grappleCooldownTimer = Mathf.Clamp(_grappleCooldownTimer - Time.deltaTime, 0, _data.GrappleCooldown);
     }
     
     if (_steadying) {
       // Decrease steady timer over time
-      _steadyTimer = Mathf.Clamp(_steadyTimer - Time.deltaTime, 0, _steadyDuration);
+      _steadyTimer = Mathf.Clamp(_steadyTimer - Time.deltaTime, 0, _data.SteadyDuration);
       // Start the cooldown if done steadying and reset the velocity
       if (Mathf.Approximately(_steadyTimer, 0)) StopSteadying();
     } else if (!Mathf.Approximately(_steadyCooldownTimer, 0)) {
       // Decrease the steady cooldown timer over time
-      _steadyCooldownTimer = Mathf.Clamp(_steadyCooldownTimer - Time.deltaTime, 0, _steadyCooldown);
+      _steadyCooldownTimer = Mathf.Clamp(_steadyCooldownTimer - Time.deltaTime, 0, _data.SteadyCooldown);
     }
     
     if (_linking) {
       // Update visual and unlink if out of range
       var distanceSquared = (_linkedPlayer.transform.position - transform.position).sqrMagnitude;
-      if (distanceSquared > _linkRange * _linkRange) StopLinking();
+      if (distanceSquared > _data.LinkRange * _data.LinkRange) StopLinking();
       else UpdateLink();
     }
   }
   
-  private void OnCollisionEnter2D(Collision2D collision)
-  {
+  private void OnCollisionEnter2D(Collision2D collision) {
     // If grappling and hit a wall, stop grappling
     if (_grappling && _collider.IsTouchingLayers(_wallLayer)) StopGrappling();
   }
@@ -211,7 +184,7 @@ public class Player : MonoBehaviour
     
     // Update the velocity based on the speed, either sprint or walk speed
     _rigidbody.linearVelocity = _moving
-      ? (_sprinting ? _sprintSpeed : _walkSpeed) * _moveDirection
+      ? (_sprinting ? _data.SprintSpeed : _data.WalkSpeed) * _moveDirection
       : new();
     
     // If no longer moving, stop sprinting
@@ -240,15 +213,16 @@ public class Player : MonoBehaviour
     if (context.started && _moving && _canSprint
       && !_dashing && !_bouncing && !_grappling && !_steadying && _stamina > 0) {
       _sprinting = true;
-      _rigidbody.linearVelocity = _sprintSpeed * _moveDirection;
+      _rigidbody.linearVelocity = _data.SprintSpeed * _moveDirection;
     }
     // If the button was released, then stop sprinting
     else if (context.canceled) {
       _shouldSprint = false;
       _sprinting = false;
+      
       // If moving and not dashing, update the velocity to walking speed
       if (_moving && !_dashing && !_bouncing && !_grappling && !_steadying)
-        _rigidbody.linearVelocity = _walkSpeed * _moveDirection;
+        _rigidbody.linearVelocity = _data.WalkSpeed * _moveDirection;
     }
   }
   
@@ -257,43 +231,43 @@ public class Player : MonoBehaviour
     // if the role allows for dashing, if the dash timer is not running,
     // and if the dash cooldown is done
     if (!context.started
-      || (_role != PlayerRole.Decoy && _role != PlayerRole.Support)
+      || (_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Support)
       || _chargingTeleport || _chargingBounce || _bouncing || _grappling
       || !Mathf.Approximately(_dashTimer, 0)
       || !Mathf.Approximately(_dashCooldownTimer, 0)) return;
     
     // Start dashing and start the timer
     _dashing = true;
-    _dashTimer = _dashDuration;
+    _dashTimer = _data.DashDuration;
     // Dash in the last move direction
-    _rigidbody.linearVelocity = _dashSpeed * _lastMoveDirection;
+    _rigidbody.linearVelocity = _data.DashSpeed * _lastMoveDirection;
   }
   
   public void OnTeleport(InputAction.CallbackContext context) {
     // A teleport can only happen if the role allows for teleporting,
     // if the teleport cooldown is done, and the player isn't dashing
-    if ((_role != PlayerRole.Observer && _role != PlayerRole.Support)
+    if ((_data.Role != PlayerRole.Observer && _data.Role != PlayerRole.Support)
       || _dashing || _chargingBounce || _bouncing || _grappling
       || !Mathf.Approximately(_teleportCooldownTimer, 0)) return;
     
     // Start charging
     if (context.started) {
       _chargingTeleport = true;
-      _teleportCharge = _teleportMinCharge;
+      _teleportCharge = _data.TeleportMinCharge;
     } else if (context.canceled && _chargingTeleport) {
       // Calculate the new position based on the charge level
-      Vector3 newPosition = transform.position + _teleportDistance
-        * (_teleportCharge / _teleportMaxCharge) * (Vector3) _lastMoveDirection;
+      Vector3 newPosition = transform.position + _data.TeleportDistance
+        * (_teleportCharge / _data.TeleportMaxCharge) * (Vector3) _lastMoveDirection;
       
       // Check if there is a wall in the way, and exit if so
       if (Physics2D.OverlapBox(newPosition, _collider.size, 0, _wallLayer)) return;
       
       // Teleport and start the cooldown
-      _teleportCooldownTimer = _teleportCooldown;
+      _teleportCooldownTimer = _data.TeleportCooldown;
       _chargingTeleport = false;
       // Teleport in the last move direction
       transform.position = newPosition;
-      _teleportCharge = _teleportMinCharge;
+      _teleportCharge = _data.TeleportMinCharge;
     }
   }
   
@@ -301,7 +275,7 @@ public class Player : MonoBehaviour
     // A bounce can only happen when the bounce button is pressed,
     // if the role allows for bouncing, if the bounce timer is not running,
     // and if the bounce cooldown is done
-    if ((_role != PlayerRole.Decoy && _role != PlayerRole.Observer)
+    if ((_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Observer)
       || _dashing || _chargingTeleport || _grappling
       || !Mathf.Approximately(_bounceTimer, 0)
       || !Mathf.Approximately(_bounceCooldownTimer, 0)) return;
@@ -309,15 +283,15 @@ public class Player : MonoBehaviour
     // Start charging
     if (context.started) {
       _chargingBounce = true;
-      _bounceCharge = _bounceMinCharge;
+      _bounceCharge = _data.BounceMinCharge;
     } else if (context.canceled && _chargingBounce) {
       // Start bouncing
       _chargingBounce = false;
       _bouncing = true;
-      _bounceTimer = _bounceDuration * (_bounceCharge / _bounceMaxCharge);
+      _bounceTimer = _data.BounceDuration * (_bounceCharge / _data.BounceMaxCharge);
       _rigidbody.sharedMaterial = _bouncyPhysics;
-      _rigidbody.linearVelocity = _bounceSpeed * _lastMoveDirection;
-      _bounceCharge = _bounceMinCharge;
+      _rigidbody.linearVelocity = _data.BounceSpeed * _lastMoveDirection;
+      _bounceCharge = _data.BounceMinCharge;
     }
   }
   
@@ -326,23 +300,23 @@ public class Player : MonoBehaviour
     // if the role allows for grappling, if the grapple timer is not running,
     // and if the grapple cooldown is done
     if (!context.canceled
-      || (_role != PlayerRole.Decoy && _role != PlayerRole.Tank)
+      || (_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Tank)
       || _dashing || _chargingTeleport || _chargingBounce || _bouncing
       || !Mathf.Approximately(_grappleTimer, 0)
       || !Mathf.Approximately(_grappleCooldownTimer, 0)) return;
     
     // Try grappling in the aim direction and exit if there is no wall in range
     var wallHit = Physics2D.Raycast(transform.position, _aimDirection,
-      _grappleRange, _wallLayer);
+      _data.GrappleRange, _wallLayer);
     if (!wallHit) return;
     // Start grappling and start the timer
     _grappling = true;
-    _grappleTimer = _grappleDuration;
+    _grappleTimer = _data.GrappleDuration;
     // Stop steadying if needed
     if (_steadying) StopSteadying();
     
     // Grapple in the aim direction
-    _rigidbody.linearVelocity = _grappleSpeed * _aimDirection;
+    _rigidbody.linearVelocity = _data.GrappleSpeed * _aimDirection;
     // Connect the grappling hook to the wall
     _grapplePoint = wallHit.point;
     _hookRenderer.gameObject.SetActive(true);
@@ -353,7 +327,7 @@ public class Player : MonoBehaviour
     // A steady can only happen if the role allows for steadying,
     // and if the steady cooldown is done
     if (!context.started
-      || (_role != PlayerRole.Observer && _role != PlayerRole.Tank)
+      || (_data.Role != PlayerRole.Observer && _data.Role != PlayerRole.Tank)
       || _dashing || _chargingTeleport || _chargingBounce
       || _bouncing || _grappling
       || !Mathf.Approximately(_steadyCooldownTimer, 0)) return;
@@ -361,11 +335,11 @@ public class Player : MonoBehaviour
     if (_steadying) {
       // Stop steadying
       _steadying = false;
-      _steadyCooldownTimer = _steadyCooldown;
+      _steadyCooldownTimer = _data.SteadyCooldown;
     } else {
       // Start steadying and start the timer
       _steadying = true;
-      _steadyTimer = _steadyDuration;
+      _steadyTimer = _data.SteadyDuration;
       // Stop moving
       _rigidbody.linearVelocity = new();
     }
@@ -374,14 +348,14 @@ public class Player : MonoBehaviour
   public void OnLink(InputAction.CallbackContext context) {
     // A link can only happen if the role allows for linking
     if (!context.started
-      || (_role != PlayerRole.Tank && _role != PlayerRole.Support)) return;
+      || (_data.Role != PlayerRole.Tank && _data.Role != PlayerRole.Support)) return;
     
     // Stop linking
     if (_linking) StopLinking();
     else {
       // Start linking if there is someone in the aim direction to link
       var playerHits = Physics2D.BoxCastAll(transform.position, _linkSearchSize,
-        0, _aimDirection, _linkRange, _playerLayer);
+        0, _aimDirection, _data.LinkRange, _playerLayer);
       if (playerHits.Length == 0) return;
       
       // Search for someone to link with
@@ -405,7 +379,7 @@ public class Player : MonoBehaviour
   public void OnHole() {
     // If a decoy or support, hover over the hole
     // If grappling, grapple over the hole
-    if (_role == PlayerRole.Decoy || _role == PlayerRole.Support
+    if (_data.Role == PlayerRole.Decoy || _data.Role == PlayerRole.Support
       || _grappling) return;
     Debug.Log("FALL IN HOLE");
   }
@@ -429,7 +403,7 @@ public class Player : MonoBehaviour
     // If trying to sprint and moving, start sprinting
     if (_shouldSprint && _moving) {
       _sprinting = true;
-      _rigidbody.linearVelocity = _sprintSpeed * _moveDirection;
+      _rigidbody.linearVelocity = _data.SprintSpeed * _moveDirection;
     }
   }
   
@@ -447,8 +421,8 @@ public class Player : MonoBehaviour
     // Start the cooldown and reset the velocity
     _grappling = false;
     _grappleTimer = 0;
-    _grappleCooldownTimer = _grappleCooldown;
-    _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+    _grappleCooldownTimer = _data.GrappleCooldown;
+    _rigidbody.linearVelocity = _moving ? _data.WalkSpeed * _moveDirection : new();
     _hookRenderer.gameObject.SetActive(false);
     // Switch to sprinting if trying to
     TryToSprint();
@@ -457,8 +431,8 @@ public class Player : MonoBehaviour
   private void StopSteadying() {
     // Start the cooldown and reset the velocity
     _steadying = false;
-    _steadyCooldownTimer = _steadyCooldown;
-    _rigidbody.linearVelocity = _moving ? _walkSpeed * _moveDirection : new();
+    _steadyCooldownTimer = _data.SteadyCooldown;
+    _rigidbody.linearVelocity = _moving ? _data.WalkSpeed * _moveDirection : new();
     // Switch to sprinting if trying to
     TryToSprint();
   }
