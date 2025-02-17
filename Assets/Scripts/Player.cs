@@ -50,6 +50,7 @@ public class Player : Hurtable {
   private bool _recoveringFromFall = false;
   private float _fallRecoverTimer = 0;
   
+  public PlayerRole Role => _data.Role;
   private int _mobility = 0;
   private int _intelligence = 0;
   private int _strength = 0;

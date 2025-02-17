@@ -16,7 +16,8 @@ public class PlayerHoleDetector : MonoBehaviour {
   }
   
   private void OnTriggerEnter2D(Collider2D collision) {
-    if (!_collider.IsTouchingLayers(_holeLayer)) return;
+    if (!_collider.IsTouchingLayers(_holeLayer)
+      || _player.Role == PlayerRole.Decoy || _player.Role == PlayerRole.Support) return;
     // If hit a hole, send the fall message
     _player.OnHole();
     
