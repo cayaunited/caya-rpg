@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4498895765684540926}
   - component: {fileID: 4577933662749762159}
   - component: {fileID: 713015332358687309}
-  m_Layer: 6
+  m_Layer: 12
   m_Name: Hole Detector
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -45,6 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b9fd79a5cc7424191b075e681c32a2fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _recoverDistance: 0.5
   _holeLayer:
     serializedVersion: 2
     m_Bits: 2048
@@ -313,32 +314,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a654f545db9064838a605fdd6c5ef71b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _walkSpeed: 2
-  _sprintSpeed: 4
-  _sprintDuration: 2
-  _dashSpeed: 10
-  _dashDuration: 0.25
-  _dashCooldown: 1
-  _teleportDistance: 6
-  _teleportCooldown: 2
-  _teleportMinCharge: 1
-  _teleportMaxCharge: 3
   _wallLayer:
     serializedVersion: 2
     m_Bits: 1024
-  _bounceSpeed: 10
-  _bounceDuration: 1
-  _bounceCooldown: 2
-  _bounceMinCharge: 0.5
-  _bounceMaxCharge: 2
-  _grappleRange: 5
-  _grappleSpeed: 7
-  _grappleDuration: 1
-  _grappleCooldown: 1
-  _steadyDuration: 2
-  _steadyCooldown: 2
   _linkSearchSize: {x: 1, y: 1}
-  _linkRange: 5
   _playerLayer:
     serializedVersion: 2
     m_Bits: 960

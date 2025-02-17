@@ -8,6 +8,7 @@ public class PlayerData : ScriptableObject {
   public int BaseIntelligence = 0;
   public int BaseStrength = 0;
   public int BaseSteadfastness = 0;
+  public float[] MaxHealth = new float[1];
   
   [Header("Movement Variables")]
   public float[] WalkSpeed = new float[1];
@@ -32,4 +33,6 @@ public class PlayerData : ScriptableObject {
   public float[] SteadyDuration = new float[1];
   public float[] SteadyCooldown = new float[1];
   public float LinkRange = 1;
+  public float[] FallDamage = new float[1];
+  public float[] FallRecoverTime = new float[1];
 }

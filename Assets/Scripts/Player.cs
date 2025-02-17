@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class Player : MonoBehaviour {
+public class Player : Hurtable {
   [Header("Movement Variables")]
   [SerializeField] private LayerMask _wallLayer = 0;
   [SerializeField] private Vector2 _linkSearchSize = new(1, 1);
@@ -47,6 +47,8 @@ public class Player : MonoBehaviour {
   private float _steadyCooldownTimer = 0;
   private bool _linking = false;
   private Player _linkedPlayer = null;
+  private bool _recoveringFromFall = false;
+  private float _fallRecoverTimer = 0;
   
   private int _mobility = 0;
   private int _intelligence = 0;
@@ -61,9 +63,14 @@ public class Player : MonoBehaviour {
     _steadfastness = _data.BaseSteadfastness;
     // The character should be able to immediately sprint
     _stamina = _data.SprintSpeed[_mobility];
+    // Start off with max health, and make sure to calculate the max health
+    Health = MaxHealth = _data.MaxHealth[_steadfastness];
   }
   
   private void Update() {
+    // Don't update if dead
+    if (!Alive) return;
+    
     // If moving and using the mouse to aim, update the aim
     if (_moving && _input.currentControlScheme == "Keyboard & Mouse") {
       UpdateMouseAim();
@@ -175,6 +182,18 @@ public class Player : MonoBehaviour {
       if (distanceSquared > _data.LinkRange * _data.LinkRange) StopLinking();
       else UpdateLink();
     }
+    
+    if (_recoveringFromFall) {
+      // Decrease recovery timer over time
+      _fallRecoverTimer = Mathf.Clamp(_fallRecoverTimer - Time.deltaTime, 0, _data.FallRecoverTime[_steadfastness]);
+      
+      // End recovery when done
+      if (Mathf.Approximately(_fallRecoverTimer, 0)) {
+        _recoveringFromFall = false;
+        _rigidbody.linearVelocity = _moving ? _data.WalkSpeed[_mobility] * _moveDirection : new();
+        TryToSprint();
+      }
+    }
   }
   
   private void OnCollisionEnter2D(Collision2D collision) {
@@ -183,6 +202,9 @@ public class Player : MonoBehaviour {
   }
   
   public void OnMove(InputAction.CallbackContext context) {
+    // Exit if dead
+    if (!Alive) return;
+    
     // Read the move direction and determine if the player is moving
     _moveDirection = context.ReadValue<Vector2>();
     _moving = !Mathf.Approximately(_moveDirection.sqrMagnitude, 0);
@@ -190,7 +212,7 @@ public class Player : MonoBehaviour {
     if (_moving) _lastMoveDirection = _moveDirection;
     
     // If dashing, bouncing, grappling, or steadying, ignore the rest
-    if (_dashing || _bouncing || _grappling || _steadying) return;
+    if (_dashing || _bouncing || _grappling || _steadying || _recoveringFromFall) return;
     
     // Update the velocity based on the speed, either sprint or walk speed
     _rigidbody.linearVelocity = _moving
@@ -202,6 +224,9 @@ public class Player : MonoBehaviour {
   }
   
   public void OnAim(InputAction.CallbackContext context) {
+    // Exit if dead
+    if (!Alive) return;
+    
     // Read the input direction and exit if there is no input
     var inputDirection = context.ReadValue<Vector2>().normalized;
     if (Mathf.Approximately(inputDirection.sqrMagnitude, 0)) return;
@@ -214,6 +239,9 @@ public class Player : MonoBehaviour {
   }
   
   public void OnSprint(InputAction.CallbackContext context) {
+    // Exit if dead
+    if (!Alive) return;
+    
     // Track if the player is wanting to sprint
     if (context.started) _shouldSprint = true;
     
@@ -221,7 +249,7 @@ public class Player : MonoBehaviour {
     // the player isn't waiting for a full stamina recharge,
     // the player isn't dashing, and there is stamina left, then start sprinting
     if (context.started && _moving && _canSprint
-      && !_dashing && !_bouncing && !_grappling && !_steadying && _stamina > 0) {
+      && !_dashing && !_bouncing && !_grappling && !_steadying && !_recoveringFromFall && _stamina > 0) {
       _sprinting = true;
       _rigidbody.linearVelocity = _data.SprintSpeed[_mobility] * _moveDirection;
     }
@@ -231,7 +259,7 @@ public class Player : MonoBehaviour {
       _sprinting = false;
       
       // If moving and not dashing, update the velocity to walking speed
-      if (_moving && !_dashing && !_bouncing && !_grappling && !_steadying)
+      if (_moving && !_dashing && !_bouncing && !_grappling && !_steadying && !_recoveringFromFall)
         _rigidbody.linearVelocity = _data.WalkSpeed[_mobility] * _moveDirection;
     }
   }
@@ -240,9 +268,10 @@ public class Player : MonoBehaviour {
     // A dash can only happen when the dash button is pressed,
     // if the role allows for dashing, if the dash timer is not running,
     // and if the dash cooldown is done
-    if (!context.started
+    if (!Alive || !context.started
       || (_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Support)
-      || _chargingTeleport || _chargingBounce || _bouncing || _grappling
+      || _chargingTeleport || _chargingBounce || _bouncing
+      || _grappling || _recoveringFromFall
       || !Mathf.Approximately(_dashTimer, 0)
       || !Mathf.Approximately(_dashCooldownTimer, 0)) return;
     
@@ -256,8 +285,9 @@ public class Player : MonoBehaviour {
   public void OnTeleport(InputAction.CallbackContext context) {
     // A teleport can only happen if the role allows for teleporting,
     // if the teleport cooldown is done, and the player isn't dashing
-    if ((_data.Role != PlayerRole.Observer && _data.Role != PlayerRole.Support)
-      || _dashing || _chargingBounce || _bouncing || _grappling
+    if (!Alive || (_data.Role != PlayerRole.Observer && _data.Role != PlayerRole.Support)
+      || _dashing || _chargingBounce || _bouncing
+      || _grappling || _recoveringFromFall
       || !Mathf.Approximately(_teleportCooldownTimer, 0)) return;
     
     // Start charging
@@ -285,8 +315,8 @@ public class Player : MonoBehaviour {
     // A bounce can only happen when the bounce button is pressed,
     // if the role allows for bouncing, if the bounce timer is not running,
     // and if the bounce cooldown is done
-    if ((_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Observer)
-      || _dashing || _chargingTeleport || _grappling
+    if (!Alive || (_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Observer)
+      || _dashing || _chargingTeleport || _grappling || _recoveringFromFall
       || !Mathf.Approximately(_bounceTimer, 0)
       || !Mathf.Approximately(_bounceCooldownTimer, 0)) return;
     
@@ -309,9 +339,10 @@ public class Player : MonoBehaviour {
     // A grapple can only happen when the grapple button is released,
     // if the role allows for grappling, if the grapple timer is not running,
     // and if the grapple cooldown is done
-    if (!context.canceled
+    if (!Alive || !context.canceled
       || (_data.Role != PlayerRole.Decoy && _data.Role != PlayerRole.Tank)
-      || _dashing || _chargingTeleport || _chargingBounce || _bouncing
+      || _dashing || _chargingTeleport || _chargingBounce
+      || _bouncing || _recoveringFromFall
       || !Mathf.Approximately(_grappleTimer, 0)
       || !Mathf.Approximately(_grappleCooldownTimer, 0)) return;
     
@@ -336,10 +367,10 @@ public class Player : MonoBehaviour {
   public void OnSteady(InputAction.CallbackContext context) {
     // A steady can only happen if the role allows for steadying,
     // and if the steady cooldown is done
-    if (!context.started
+    if (!Alive || !context.started
       || (_data.Role != PlayerRole.Observer && _data.Role != PlayerRole.Tank)
       || _dashing || _chargingTeleport || _chargingBounce
-      || _bouncing || _grappling
+      || _bouncing || _grappling || _recoveringFromFall
       || !Mathf.Approximately(_steadyCooldownTimer, 0)) return;
     
     if (_steadying) {
@@ -357,8 +388,9 @@ public class Player : MonoBehaviour {
   
   public void OnLink(InputAction.CallbackContext context) {
     // A link can only happen if the role allows for linking
-    if (!context.started
-      || (_data.Role != PlayerRole.Tank && _data.Role != PlayerRole.Support)) return;
+    if (!Alive || !context.started
+      || (_data.Role != PlayerRole.Tank && _data.Role != PlayerRole.Support)
+      || _recoveringFromFall) return;
     
     // Stop linking
     if (_linking) StopLinking();
@@ -391,7 +423,14 @@ public class Player : MonoBehaviour {
     // If grappling, grapple over the hole
     if (_data.Role == PlayerRole.Decoy || _data.Role == PlayerRole.Support
       || _grappling) return;
-    Debug.Log("FALL IN HOLE");
+    // Hurt the player with fall damage
+    Hurt(_data.FallDamage[_steadfastness]);
+    // Freeze temporarily
+    _recoveringFromFall = true;
+    _fallRecoverTimer = _data.FallRecoverTime[_steadfastness];
+    _rigidbody.linearVelocity = new();
+    // If linking, stop
+    if (_linking) StopLinking();
   }
   
   private void UpdateMouseAim() {
